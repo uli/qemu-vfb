@@ -107,6 +107,8 @@ obj-y += $(addprefix ../libuser/, $(user-obj-y))
 obj-y += $(addprefix ../libdis-user/, $(libdis-y))
 obj-y += $(libobj-y)
 
+LIBS += -lSDL
+
 endif #CONFIG_LINUX_USER
 
 #########################################################
