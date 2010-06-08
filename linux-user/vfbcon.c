@@ -20,6 +20,8 @@
 #include "vfbcon.h"
 #include <linux/vt.h>
 #include <linux/kd.h>
+#include <linux/fb.h>
+#include <asm/ioctls.h>
 
 SDL_Surface *fb_screen = NULL;
 
@@ -33,11 +35,71 @@ vkbd_t vkbd = {
     .mode = KD_TEXT,
 };
 
+struct fb_var_screeninfo vfb_var = {
+    .xres = 320,
+    .yres = 240,
+    .xres_virtual = 320,
+    .yres_virtual = 240,
+    .xoffset = 0,
+    .yoffset = 0,
+    .bits_per_pixel = 16,
+    .grayscale = 0,
+    .red = {0, 5, 0},
+    .blue = {5, 6, 0},
+    .green = {11, 5, 0},
+    .nonstd = 0,
+    .height = 50,
+    .width = 100,
+};
+int fb_fd = -1;
+
+static void dump_vscreen(void)
+{
+    fprintf(stderr, "xres %d yres %d xres_virtual %d yres_virtual %d\n", vfb_var.xres, vfb_var.yres, vfb_var.xres_virtual, vfb_var.yres_virtual);
+    fprintf(stderr, "xoffset %d yoffset %d bpp %d grayscale %d\n", vfb_var.xoffset, vfb_var.yoffset, vfb_var.bits_per_pixel, vfb_var.grayscale);    
+}
+
+struct fb_fix_screeninfo vfb_fix = {
+    .smem_start = 0xdead0000,
+    .smem_len = 262144,
+    .type = FB_TYPE_PACKED_PIXELS,
+    .visual = FB_VISUAL_DIRECTCOLOR,
+    .line_length = 640,
+    .mmio_start = 0xcafe0000,
+    .mmio_len = 0x42,
+};
+
+int do_virtual_fb_mmap(abi_ulong *ret, abi_ulong start, abi_ulong len,
+                       int prot, int flags, int fd, abi_ulong offset)
+{
+    int kbd_state_size;
+    uint8_t *kbdstate;
+    if (fd > 0 && fd == fb_fd) {
+        if (!fb_screen) {
+            /* FIXME: Where's SDL_Init()? */
+            fb_screen = SDL_SetVideoMode(vfb_var.xres, vfb_var.yres, vfb_var.bits_per_pixel, SDL_HWSURFACE);
+            if (!fb_screen) {
+                fprintf(stderr, "Could not set video mode: %s\n", SDL_GetError());
+                abort();
+            }
+            SDL_WM_SetCaption("QEMU Virtual Framebuffer", NULL);
+            kbdstate = SDL_GetKeyState(&kbd_state_size);
+            vkbd_sdlstate = malloc(kbd_state_size); /* FIXME: When to release this? */
+            memcpy(vkbd_sdlstate, kbdstate, kbd_state_size);
+        }
+        *ret = h2g(fb_screen->pixels + offset);
+        return 1;
+    } else {
+        return 0;
+    }
+}
 
 int do_virtual_tty_select(int *ret, int n, fd_set *rfds_ptr, fd_set *wfds_ptr,
                           fd_set *efds_ptr, struct timeval *tv_ptr)
 {
     if (vkbd_fd != -1 && n > vkbd_fd && FD_ISSET(vkbd_fd, rfds_ptr)) {
+        if (fb_screen)
+            SDL_Flip(fb_screen);
         fprintf(stderr, "keyboard select!!\n");
         int sz, i;
         SDL_PumpEvents();
@@ -77,15 +139,66 @@ int vfbcon_ioctl_null(int *ret, int fd, int request)
 
 int vfbcon_ioctl_int(int *ret, int fd, int request, abi_long arg)
 {
-    return 0;
+    switch (request) {
+        case KDSETMODE:
+            vkbd.mode = arg;
+            *ret = 0;
+            break;
+        case KDSKBMODE:
+            vkbd.state = arg;
+            *ret = 0;
+            break;
+        default:
+            return 0;
+    };
+    return 1;
 }
+
+#include "defkeymap.c_shipped"
 
 int vfbcon_ioctl_ptr(int access, int *ret, int fd, int request, void *argptr)
 {
+    struct kbentry *kbe;
     switch (request) {
+        case FBIOGET_FSCREENINFO:
+            *(struct fb_fix_screeninfo *)argptr = vfb_fix;
+            *ret = 0;
+            break;
+        case FBIOGET_VSCREENINFO:
+            *(struct fb_var_screeninfo *)argptr = vfb_var;
+            *ret = 0;
+            break;
+        case FBIOPUT_VSCREENINFO:
+            vfb_var = *(struct fb_var_screeninfo *)argptr;
+            dump_vscreen();
+            *ret = 0;
+            break;
+        case KDGKBENT:
+            kbe = (struct kbentry *)argptr;
+            u_short *map = key_maps[kbe->kb_table];
+            if (map) {
+                kbe->kb_value = map[kbe->kb_index] & 0xfff;
+            } else {
+                if (kbe->kb_index)
+                    kbe->kb_value = K_HOLE;
+                else
+                    kbe->kb_value = K_NOSUCHMAP;
+            }
+            fprintf(stderr, "table %d index %d value %d\n", kbe->kb_table, kbe->kb_index, kbe->kb_value);
+            *ret = 0;
+            break;
         case KDGKBMODE:
             *(abi_long *)argptr = vkbd.state;
             *ret = 0;
+            break;
+        case TCGETS:
+        case TCSETSF:
+            *ret = 0;
+            break;
+        case VT_GETSTATE:
+        case VT_LOCKSWITCH:
+        case VT_UNLOCKSWITCH:
+            *ret = -1;
             break;
         default:
             return 0;

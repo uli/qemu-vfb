@@ -933,7 +933,6 @@ static inline abi_long copy_to_user_mq_attr(abi_ulong target_mq_attr_addr,
 }
 #endif
 
-#include <sys/select.h>
 /* do_select() must return target values and target errnos. */
 static abi_long do_select(int n,
                           abi_ulong rfd_addr, abi_ulong wfd_addr,
@@ -943,10 +942,6 @@ static abi_long do_select(int n,
     fd_set *rfds_ptr, *wfds_ptr, *efds_ptr;
     struct timeval tv, *tv_ptr;
     abi_long ret;
-
-    if (fb_screen) {
-        SDL_Flip(fb_screen);
-    }
 
     if (rfd_addr) {
         if (copy_from_user_fdset(&rfds, rfd_addr, n))
@@ -2943,42 +2938,6 @@ static IOCTLEntry ioctl_entries[] = {
     { 0, 0, },
 };
 
-struct fb_var_screeninfo vfb_var = {
-    .xres = 320,
-    .yres = 240,
-    .xres_virtual = 320,
-    .yres_virtual = 240,
-    .xoffset = 0,
-    .yoffset = 0,
-    .bits_per_pixel = 16,
-    .grayscale = 0,
-    .red = {0, 5, 0},
-    .blue = {5, 6, 0},
-    .green = {11, 5, 0},
-    .nonstd = 0,
-    .height = 50,
-    .width = 100,
-};
-int fb_fd = -1;
-
-static void dump_vscreen(void)
-{
-    fprintf(stderr, "xres %d yres %d xres_virtual %d yres_virtual %d\n", vfb_var.xres, vfb_var.yres, vfb_var.xres_virtual, vfb_var.yres_virtual);
-    fprintf(stderr, "xoffset %d yoffset %d bpp %d grayscale %d\n", vfb_var.xoffset, vfb_var.yoffset, vfb_var.bits_per_pixel, vfb_var.grayscale);    
-}
-
-struct fb_fix_screeninfo vfb_fix = {
-    .smem_start = 0xdead0000,
-    .smem_len = 262144,
-    .type = FB_TYPE_PACKED_PIXELS,
-    .visual = FB_VISUAL_DIRECTCOLOR,
-    .line_length = 640,
-    .mmio_start = 0xcafe0000,
-    .mmio_len = 0x42,
-};
-
-#include "defkeymap.c_shipped"
-
 static int hook_ioctl_null(int fd, int request)
 {
     int ret;
@@ -3037,101 +2996,6 @@ static abi_long do_ioctl(int fd, abi_long cmd, abi_long arg)
 #if defined(DEBUG)
     gemu_log("ioctl: cmd=0x%04lx (%s)\n", (long)cmd, ie->name);
 #endif
-    switch (ie->host_cmd) {
-        case KDSKBMODE:
-            vkbd.state = arg;
-            return 0;
-            break;
-        case KDSETMODE:
-            vkbd.mode = arg;
-            return 0;
-            break;
-        case KDGKBENT:
-#if 0
-            arg_type++;
-            target_size = thunk_type_size(arg_type, 0);
-            argptr = lock_user(VERIFY_READ, arg, target_size, 1);
-            if (!argptr)
-                return -TARGET_EFAULT;
-            thunk_convert(buf_temp, argptr, arg_type, THUNK_HOST);
-            unlock_user(argptr, arg, 0);
-            ret = get_errno(ioctl(fd, ie->host_cmd, buf_temp));
-            if (!is_error(ret)) {
-                argptr = lock_user(VERIFY_WRITE, arg, target_size, 0);
-                if (!argptr)
-                    return -TARGET_EFAULT;
-                thunk_convert(argptr, buf_temp, arg_type, THUNK_TARGET);
-                struct kbentry *kbe = (struct kbentry*)buf_temp;
-                fprintf(stderr, "table %d index %d value 0x%x\n", kbe->kb_table, kbe->kb_index, kbe->kb_value);
-                unlock_user(argptr, arg, target_size);
-            }
-#else
-            argptr = lock_user(VERIFY_WRITE, arg, sizeof(struct kbentry), 0);
-            if (!argptr)
-                return -TARGET_EFAULT;
-            struct kbentry *kbe = (struct kbentry*)argptr;
-            u_short *map = key_maps[kbe->kb_table];
-            if (map) {
-                kbe->kb_value = map[kbe->kb_index] & 0xfff;
-            }
-            else {
-                if (kbe->kb_index) kbe->kb_value = K_HOLE;
-                else kbe->kb_value = K_NOSUCHMAP;
-            }
-            fprintf(stderr, "table %d index %d value %d\n", kbe->kb_table, kbe->kb_index, kbe->kb_value);
-            unlock_user(argptr, arg, sizeof(struct kbentry));
-#endif
-            return 0;
-        case FBIOGET_VSCREENINFO:
-            arg_type++;
-            target_size = thunk_type_size(arg_type, 0);
-            argptr = lock_user(VERIFY_WRITE, arg, target_size, 0);
-            if (!argptr)
-                return -TARGET_EFAULT;
-            //*((struct fb_var_screeninfo*)argptr) = vfb_var;
-            thunk_convert(argptr, &vfb_var, arg_type, THUNK_TARGET);
-            unlock_user(argptr, arg, 0);
-            return 0;
-        case FBIOPUT_VSCREENINFO:
-            arg_type++;
-            target_size = thunk_type_size(arg_type, 0);
-            argptr = lock_user(VERIFY_READ, arg, target_size, 1);
-            if (!argptr)
-                return -TARGET_EFAULT;
-            //vfb_var = *((struct fb_var_screeninfo*)argptr);
-            thunk_convert(&vfb_var, argptr, arg_type, THUNK_HOST);
-            dump_vscreen();
-            unlock_user(argptr, arg, sizeof(struct fb_var_screeninfo));
-            return 0;
-        case FBIOGET_FSCREENINFO:
-            arg_type++;
-            target_size = thunk_type_size(arg_type, 0);
-            argptr = lock_user(VERIFY_WRITE, arg, target_size, 0);
-            if (!argptr)
-                return -TARGET_EFAULT;
-            //*((struct fb_fix_screeninfo*)argptr) = vfb_fix;
-            thunk_convert(argptr, &vfb_fix, arg_type, THUNK_TARGET);
-            unlock_user(argptr, arg, 0);
-            return 0;
-        case VT_GETSTATE:
-            return -1;
-        case TCGETS:
-            return 0;
-        case TCSETSF:
-            return 0;
-        case VT_LOCKSWITCH:
-            return -1;
-        case VT_UNLOCKSWITCH:
-            return -1;
-        default:
-#if 0
-            if (vkbd_fd != -1 && fd == vkbd_fd) {
-                fprintf(stderr,"unknown tty ioctl 0x%x\n", ie->host_cmd);
-                abort();
-            }
-#endif
-            break;
-    }
     switch(arg_type[0]) {
     case TYPE_NULL:
         /* no argument */
@@ -3149,13 +3013,11 @@ static abi_long do_ioctl(int fd, abi_long cmd, abi_long arg)
         case IOC_R:
             ret = hook_ioctl_ptr(IOC_R, fd, ie->host_cmd, buf_temp);
             if (!is_error(ret)) {
-                fprintf(stderr,"IOC_RRRRRRRRRRR\n");
                 argptr = lock_user(VERIFY_WRITE, arg, target_size, 0);
                 if (!argptr)
                     return -TARGET_EFAULT;
                 thunk_convert(argptr, buf_temp, arg_type, THUNK_TARGET);
                 unlock_user(argptr, arg, target_size);
-                fprintf(stderr,"IOC_RRRRRRRRRRR FEDDICH\n");
             }
             break;
         case IOC_W:

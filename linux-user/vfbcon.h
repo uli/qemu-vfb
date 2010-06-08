@@ -25,6 +25,7 @@ extern int vkbd_fd;
 extern uint8_t *vkbd_sdlstate;
 extern uint8_t key_buf[1024];
 extern int key_buf_pos;
+extern int fb_fd;
 
 typedef struct {
     abi_long state;
@@ -35,6 +36,8 @@ extern vkbd_t vkbd;
 
 int do_virtual_tty_select(int *ret, int n, fd_set *rfds_ptr, fd_set *wfds_ptr,
                           fd_set *efds_ptr, struct timeval *tv_ptr);
+int do_virtual_fb_mmap(abi_ulong *ret, abi_ulong start, abi_ulong len, int prot,
+                          int flags, int fd, abi_ulong offset);
 
 int vfbcon_ioctl_null(int *ret, int fd, int request);
 int vfbcon_ioctl_int(int *ret, int fd, int request, abi_long arg);

@@ -360,12 +360,9 @@ abi_ulong mmap_find_vma(abi_ulong start, abi_ulong size)
     }
 }
 
-#include <SDL/SDL.h>
-#include <linux/fb.h>
-extern struct fb_var_screeninfo vfb_var;
-extern int fb_fd;
-extern SDL_Surface *fb_screen;
-extern uint8_t* vkbd_sdlstate;
+#ifdef CONFIG_VIRTUAL_FBCON
+#include "vfbcon.h"
+#endif
 
 /* NOTE: all the constants are the HOST ones */
 abi_long target_mmap(abi_ulong start, abi_ulong len, int prot,
@@ -374,25 +371,9 @@ abi_long target_mmap(abi_ulong start, abi_ulong len, int prot,
     abi_ulong ret, end, real_start, real_end, retaddr, host_offset, host_len;
     unsigned long host_start;
 
-#if 1
-    if (fd > 0 && fd == fb_fd) {
-        if (fb_screen)
-            return h2g(fb_screen->pixels+offset);
-        else {
-            fb_screen = SDL_SetVideoMode(vfb_var.xres, vfb_var.yres, vfb_var.bits_per_pixel, SDL_HWSURFACE);
-            if (!fb_screen) {
-                fprintf(stderr,SDL_GetError());
-                abort();
-            }
-            SDL_WM_SetCaption("QEMU Dingux Emulator", NULL);
-            int kbdssize;
-            uint8_t *kbdstate = SDL_GetKeyState(&kbdssize);
-            vkbd_sdlstate = malloc(kbdssize);
-            memcpy(vkbd_sdlstate, kbdstate, kbdssize);
-            memset(fb_screen->pixels, 0x42, 10000);
-            return h2g(fb_screen->pixels+offset);
-        }
-    }
+#ifdef CONFIG_VIRTUAL_FBCON
+    if (do_virtual_fb_mmap(&ret, start, len, prot, flags, fd, offset))
+        return ret;
 #endif
 
     mmap_lock();
