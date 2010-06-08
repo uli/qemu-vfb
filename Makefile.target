@@ -90,6 +90,8 @@ obj-y = main.o syscall.o strace.o mmap.o signal.o thunk.o \
 
 obj-$(TARGET_HAS_BFLT) += flatload.o
 
+obj-$(CONFIG_VIRTUAL_FBCON) += vfbcon.o
+
 obj-$(TARGET_I386) += vm86.o
 
 obj-i386-y += ioport-user.o
@@ -106,8 +108,6 @@ $(obj-y) $(obj-$(TARGET_BASE_ARCH)-y): $(GENERATED_HEADERS)
 obj-y += $(addprefix ../libuser/, $(user-obj-y))
 obj-y += $(addprefix ../libdis-user/, $(libdis-y))
 obj-y += $(libobj-y)
-
-LIBS += -lSDL
 
 endif #CONFIG_LINUX_USER
 

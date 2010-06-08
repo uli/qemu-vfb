@@ -298,6 +298,7 @@ blobs="yes"
 pkgversion=""
 check_utests="no"
 user_pie="no"
+user_vfbcon="no"
 zero_malloc=""
 
 # OS specific
@@ -610,6 +611,10 @@ for opt do
   ;;
   --disable-user-pie) user_pie="no"
   ;;
+  --enable-user-vfbcon)
+    user_vfbcon="yes"
+    sdl="yes"
+  ;;
   --enable-uname-release=*) uname_release="$optarg"
   ;;
   --sparc_cpu=*)
@@ -808,6 +813,7 @@ echo "                           emulation targets"
 echo "  --disable-guest-base     disable GUEST_BASE support"
 echo "  --enable-user-pie        build usermode emulation targets as PIE"
 echo "  --disable-user-pie       do not build usermode emulation targets as PIE"
+echo "  --enable-user-vfbcon     enable virtual framebuffer console in SDL window"
 echo "  --fmod-lib               path to FMOD library"
 echo "  --fmod-inc               path to FMOD includes"
 echo "  --oss-lib                path to OSS library"
@@ -2031,6 +2037,7 @@ echo "uname -r          $uname_release"
 echo "NPTL support      $nptl"
 echo "GUEST_BASE        $guest_base"
 echo "PIE user targets  $user_pie"
+echo "Virtual FBCon     $user_vfbcon"
 echo "vde support       $vde"
 echo "IO thread         $io_thread"
 echo "Linux AIO support $linux_aio"
@@ -2728,6 +2735,12 @@ if test "$target_user_only" = "yes" -a "$static" = "no" -a \
   ldflags="-pie $ldflags"
 fi
 
+if test "$target_user_only" = "yes" -a "$user_vfbcon" = "yes" ; then
+  echo "CONFIG_VIRTUAL_FBCON=y" >> $config_target_mak
+  #echo "LIBS+=$sdl_libs" >> $config_target_mak
+  echo "LIBS+=-lSDL" >> $config_target_mak
+fi
+  
 if test "$target_softmmu" = "yes" -a \( \
         "$TARGET_ARCH" = "microblaze" -o \
         "$TARGET_ARCH" = "cris" \) ; then

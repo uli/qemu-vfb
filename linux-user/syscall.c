@@ -91,6 +91,10 @@ int __clone2(int (*fn)(void *), void *child_stack_base,
 #include "qemu.h"
 #include "qemu-common.h"
 
+#ifdef CONFIG_VIRTUAL_FBCON
+#include "vfbcon.h"
+#endif
+
 #if defined(CONFIG_USE_NPTL)
 #define CLONE_NPTL_FLAGS2 (CLONE_SETTLS | \
     CLONE_PARENT_SETTID | CLONE_CHILD_SETTID | CLONE_CHILD_CLEARTID)
@@ -929,14 +933,6 @@ static inline abi_long copy_to_user_mq_attr(abi_ulong target_mq_attr_addr,
 }
 #endif
 
-#include <SDL/SDL.h>
-SDL_Surface *fb_screen = NULL;
-
-int vkbd_fd = -1;
-uint8_t *vkbd_sdlstate = NULL;
-uint8_t key_buf[1024];
-int key_buf_pos = 0;
-
 #include <sys/select.h>
 /* do_select() must return target values and target errnos. */
 static abi_long do_select(int n,
@@ -982,32 +978,11 @@ static abi_long do_select(int n,
         tv_ptr = NULL;
     }
 
-    if (vkbd_fd != -1 && n > vkbd_fd && FD_ISSET(vkbd_fd, rfds_ptr)) {
-        fprintf(stderr, "keyboard select!!\n");
-        int sz, i;
-        SDL_PumpEvents();
-        uint8_t *cstate = SDL_GetKeyState(&sz);
-        uint8_t key;
-        for (i = 0; i < sz; i++) {
-            if (cstate[i] != vkbd_sdlstate[i]) {
-                switch (i) {
-                case SDLK_UP: key = 103; break;
-                case SDLK_RIGHT: key = 106; break;
-                case SDLK_DOWN: key = 108; break;
-                case SDLK_LEFT: key = 105; break;
-                case SDLK_LALT: key = 56; break;
-                case SDLK_RETURN: key = 28; break;
-                default: key = i; break;
-                }
-                if (cstate[i] == 0 && vkbd_sdlstate[i] == 1) {
-                    key |= 0x80;	/* released */
-                }
-                key_buf[key_buf_pos++] = key;
-            }
-        }
-        memcpy(vkbd_sdlstate, cstate, sz);
-        if (key_buf_pos > 0) return 1;
-    }
+#ifdef CONFIG_VIRTUAL_FBCON
+    if (do_virtual_tty_select(&ret, n, rfds_ptr, wfds_ptr, efds_ptr, tv_ptr))
+        return ret;
+#endif
+
     ret = get_errno(select(n, rfds_ptr, wfds_ptr, efds_ptr, tv_ptr));
 
     if (!is_error(ret)) {
@@ -2968,16 +2943,6 @@ static IOCTLEntry ioctl_entries[] = {
     { 0, 0, },
 };
 
-typedef struct {
-    abi_long state;
-    abi_long mode;
-} vkbd_t;
-
-vkbd_t vkbd = {
-    .state = K_XLATE,
-    .mode = KD_TEXT,
-};
-
 struct fb_var_screeninfo vfb_var = {
     .xres = 320,
     .yres = 240,
@@ -3014,6 +2979,39 @@ struct fb_fix_screeninfo vfb_fix = {
 
 #include "defkeymap.c_shipped"
 
+static int hook_ioctl_null(int fd, int request)
+{
+    int ret;
+#ifdef CONFIG_VIRTUAL_FBCON
+    if (vfbcon_ioctl_null(&ret, fd, request))
+        return ret;
+#endif
+    ret = get_errno(ioctl(fd, request));
+    return ret;
+}
+
+static int hook_ioctl_int(int fd, int request, abi_long arg)
+{
+    int ret;
+#ifdef CONFIG_VIRTUAL_FBCON
+    if (vfbcon_ioctl_int(&ret, fd, request, arg))
+        return ret;
+#endif
+    ret = get_errno(ioctl(fd, request, arg));
+    return ret;
+}
+
+static int hook_ioctl_ptr(int access, int fd, int request, void *argptr)
+{
+    int ret;
+#ifdef CONFIG_VIRTUAL_FBCON
+    if (vfbcon_ioctl_ptr(access, &ret, fd, request, argptr))
+        return ret;
+#endif
+    ret = get_errno(ioctl(fd, request, argptr));
+    return ret;
+}
+
 /* ??? Implement proper locking for ioctls.  */
 /* do_ioctl() Must return target values and target errnos. */
 static abi_long do_ioctl(int fd, abi_long cmd, abi_long arg)
@@ -3040,13 +3038,6 @@ static abi_long do_ioctl(int fd, abi_long cmd, abi_long arg)
     gemu_log("ioctl: cmd=0x%04lx (%s)\n", (long)cmd, ie->name);
 #endif
     switch (ie->host_cmd) {
-        case KDGKBMODE:
-            argptr = lock_user(VERIFY_WRITE, arg, sizeof(abi_long), 0);
-            if (!argptr)
-                return -TARGET_EFAULT;
-            *(abi_long*)argptr = tswap32(vkbd.state);
-            unlock_user(argptr, arg, sizeof(abi_long));
-            return 0;
         case KDSKBMODE:
             vkbd.state = arg;
             return 0;
@@ -3133,34 +3124,38 @@ static abi_long do_ioctl(int fd, abi_long cmd, abi_long arg)
         case VT_UNLOCKSWITCH:
             return -1;
         default:
+#if 0
             if (vkbd_fd != -1 && fd == vkbd_fd) {
                 fprintf(stderr,"unknown tty ioctl 0x%x\n", ie->host_cmd);
                 abort();
             }
+#endif
             break;
     }
     switch(arg_type[0]) {
     case TYPE_NULL:
         /* no argument */
-        ret = get_errno(ioctl(fd, ie->host_cmd));
+        ret = hook_ioctl_null(fd, ie->host_cmd);
         break;
     case TYPE_PTRVOID:
     case TYPE_INT:
         /* int argment */
-        ret = get_errno(ioctl(fd, ie->host_cmd, arg));
+        ret = hook_ioctl_int(fd, ie->host_cmd, arg);
         break;
     case TYPE_PTR:
         arg_type++;
         target_size = thunk_type_size(arg_type, 0);
         switch(ie->access) {
         case IOC_R:
-            ret = get_errno(ioctl(fd, ie->host_cmd, buf_temp));
+            ret = hook_ioctl_ptr(IOC_R, fd, ie->host_cmd, buf_temp);
             if (!is_error(ret)) {
+                fprintf(stderr,"IOC_RRRRRRRRRRR\n");
                 argptr = lock_user(VERIFY_WRITE, arg, target_size, 0);
                 if (!argptr)
                     return -TARGET_EFAULT;
                 thunk_convert(argptr, buf_temp, arg_type, THUNK_TARGET);
                 unlock_user(argptr, arg, target_size);
+                fprintf(stderr,"IOC_RRRRRRRRRRR FEDDICH\n");
             }
             break;
         case IOC_W:
@@ -3169,7 +3164,7 @@ static abi_long do_ioctl(int fd, abi_long cmd, abi_long arg)
                 return -TARGET_EFAULT;
             thunk_convert(buf_temp, argptr, arg_type, THUNK_HOST);
             unlock_user(argptr, arg, 0);
-            ret = get_errno(ioctl(fd, ie->host_cmd, buf_temp));
+            ret = hook_ioctl_ptr(IOC_W, fd, ie->host_cmd, buf_temp);
             break;
         default:
         case IOC_RW:
@@ -3178,7 +3173,7 @@ static abi_long do_ioctl(int fd, abi_long cmd, abi_long arg)
                 return -TARGET_EFAULT;
             thunk_convert(buf_temp, argptr, arg_type, THUNK_HOST);
             unlock_user(argptr, arg, 0);
-            ret = get_errno(ioctl(fd, ie->host_cmd, buf_temp));
+            ret = hook_ioctl_ptr(IOC_RW, fd, ie->host_cmd, buf_temp);
             if (!is_error(ret)) {
                 argptr = lock_user(VERIFY_WRITE, arg, target_size, 0);
                 if (!argptr)
@@ -4458,7 +4453,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
         if (!(p = lock_user_string(arg1)))
             goto efault;
         const char *pp = p;
-        if (!strcmp(p, "/dev/tty")) pp = "/dev/tty3";
+        if (!strcmp(p, "/dev/tty")) pp = "/dev/null";
         else pp = p;
         ret = get_errno(open(path(pp),
                              target_to_host_bitmask(arg2, fcntl_flags_tbl),
