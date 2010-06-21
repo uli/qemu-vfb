@@ -108,12 +108,45 @@ int do_virtual_tty_select(int *ret, int n, fd_set *rfds_ptr, fd_set *wfds_ptr,
         for (i = 0; i < sz; i++) {
             if (cstate[i] != vkbd_sdlstate[i]) {
                 switch (i) {
+                case SDLK_ESCAPE: key = 1; break;
+                case SDLK_BACKSPACE: key = 14; break;
+                case SDLK_TAB: key = 15; break;
+                case SDLK_q: key = 16; break;
+                case SDLK_w: key = 17; break;
+                case SDLK_e: key = 18; break;
+                case SDLK_r: key = 19; break;
+                case SDLK_t: key = 20; break;
+                case SDLK_y: key = 21; break;
+                case SDLK_u: key = 22; break;
+                case SDLK_i: key = 23; break;
+                case SDLK_o: key = 24; break;
+                case SDLK_p: key = 25; break;
+                case SDLK_RETURN: key = 28; break;
+                case SDLK_LCTRL: key = 29; break;
+                case SDLK_a: key = 30; break;
+                case SDLK_s: key = 31; break;
+                case SDLK_d: key = 32; break;
+                case SDLK_f: key = 33; break;
+                case SDLK_g: key = 34; break;
+                case SDLK_h: key = 35; break;
+                case SDLK_j: key = 36; break;
+                case SDLK_k: key = 37; break;
+                case SDLK_l: key = 38; break;
+                case SDLK_LSHIFT: key = 42; break;
+                case SDLK_z: key = 44; break;
+                case SDLK_x: key = 45; break;
+                case SDLK_c: key = 46; break;
+                case SDLK_v: key = 47; break;
+                case SDLK_b: key = 48; break;
+                case SDLK_n: key = 49; break;
+                case SDLK_m: key = 50; break;
+                case SDLK_LALT: key = 56; break;
+                case SDLK_SPACE: key = 57; break;
                 case SDLK_UP: key = 103; break;
                 case SDLK_RIGHT: key = 106; break;
                 case SDLK_DOWN: key = 108; break;
                 case SDLK_LEFT: key = 105; break;
-                case SDLK_LALT: key = 56; break;
-                case SDLK_RETURN: key = 28; break;
+                case SDLK_MENU: key = 127; break;
                 default: key = i; break;
                 }
                 if (cstate[i] == 0 && vkbd_sdlstate[i] == 1) {
