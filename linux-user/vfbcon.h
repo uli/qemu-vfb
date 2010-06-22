@@ -34,6 +34,8 @@ typedef struct {
 
 extern vkbd_t vkbd;
 
+void vfb_update_screen(void);
+
 int do_virtual_tty_select(int *ret, int n, fd_set *rfds_ptr, fd_set *wfds_ptr,
                           fd_set *efds_ptr, struct timeval *tv_ptr);
 int do_virtual_fb_mmap(abi_ulong *ret, abi_ulong start, abi_ulong len, int prot,

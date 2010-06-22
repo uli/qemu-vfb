@@ -69,6 +69,24 @@ struct fb_fix_screeninfo vfb_fix = {
     .mmio_len = 0x42,
 };
 
+void vfb_update_screen(void)
+{
+    static uint64_t time = 0;
+    uint64_t newtime;
+    struct timeval tv;
+    
+    if (!fb_screen)
+        return;
+    
+    gettimeofday(&tv, NULL);
+    newtime = tv.tv_sec * 1000000 + tv.tv_usec;
+    
+    if (newtime - time > 1000000 / 60) {
+        time = newtime;
+        SDL_Flip(fb_screen);
+    }
+}
+
 int do_virtual_fb_mmap(abi_ulong *ret, abi_ulong start, abi_ulong len,
                        int prot, int flags, int fd, abi_ulong offset)
 {
@@ -98,9 +116,6 @@ int do_virtual_tty_select(int *ret, int n, fd_set *rfds_ptr, fd_set *wfds_ptr,
                           fd_set *efds_ptr, struct timeval *tv_ptr)
 {
     if (vkbd_fd != -1 && n > vkbd_fd && FD_ISSET(vkbd_fd, rfds_ptr)) {
-        if (fb_screen)
-            SDL_Flip(fb_screen);
-        fprintf(stderr, "keyboard select!!\n");
         int sz, i;
         SDL_PumpEvents();
         uint8_t *cstate = SDL_GetKeyState(&sz);
@@ -217,7 +232,6 @@ int vfbcon_ioctl_ptr(int access, int *ret, int fd, int request, void *argptr)
                 else
                     kbe->kb_value = K_NOSUCHMAP;
             }
-            fprintf(stderr, "table %d index %d value %d\n", kbe->kb_table, kbe->kb_index, kbe->kb_value);
             *ret = 0;
             break;
         case KDGKBMODE:

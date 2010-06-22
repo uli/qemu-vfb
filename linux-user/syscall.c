@@ -4236,6 +4236,10 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
     struct statfs stfs;
     void *p;
 
+#ifdef CONFIG_VIRTUAL_FBCON
+    vfb_update_screen();
+#endif
+
 #ifdef DEBUG
     gemu_log("syscall %d", num);
 #endif
