@@ -124,6 +124,18 @@ int do_virtual_tty_select(int *ret, int n, fd_set *rfds_ptr, fd_set *wfds_ptr,
             if (cstate[i] != vkbd_sdlstate[i]) {
                 switch (i) {
                 case SDLK_ESCAPE: key = 1; break;
+                case SDLK_1: key = 2; break;
+                case SDLK_2: key = 3; break;
+                case SDLK_3: key = 4; break;
+                case SDLK_4: key = 5; break;
+                case SDLK_5: key = 6; break;
+                case SDLK_6: key = 7; break;
+                case SDLK_7: key = 8; break;
+                case SDLK_8: key = 9; break;
+                case SDLK_9: key = 10; break;
+                case SDLK_0: key = 11; break;
+                case SDLK_MINUS: key = 12; break;
+                case SDLK_EQUALS: key = 13; break;
                 case SDLK_BACKSPACE: key = 14; break;
                 case SDLK_TAB: key = 15; break;
                 case SDLK_q: key = 16; break;
@@ -136,6 +148,8 @@ int do_virtual_tty_select(int *ret, int n, fd_set *rfds_ptr, fd_set *wfds_ptr,
                 case SDLK_i: key = 23; break;
                 case SDLK_o: key = 24; break;
                 case SDLK_p: key = 25; break;
+                case SDLK_LEFTBRACKET: key = 26; break;
+                case SDLK_RIGHTBRACKET: key = 27; break;
                 case SDLK_RETURN: key = 28; break;
                 case SDLK_LCTRL: key = 29; break;
                 case SDLK_a: key = 30; break;
@@ -147,7 +161,11 @@ int do_virtual_tty_select(int *ret, int n, fd_set *rfds_ptr, fd_set *wfds_ptr,
                 case SDLK_j: key = 36; break;
                 case SDLK_k: key = 37; break;
                 case SDLK_l: key = 38; break;
+                case SDLK_SEMICOLON: key = 39; break;
+                case SDLK_QUOTE: key = 40; break;
+                case SDLK_BACKQUOTE: key = 41; break;
                 case SDLK_LSHIFT: key = 42; break;
+                case SDLK_BACKSLASH: key = 43; break;
                 case SDLK_z: key = 44; break;
                 case SDLK_x: key = 45; break;
                 case SDLK_c: key = 46; break;
@@ -155,19 +173,69 @@ int do_virtual_tty_select(int *ret, int n, fd_set *rfds_ptr, fd_set *wfds_ptr,
                 case SDLK_b: key = 48; break;
                 case SDLK_n: key = 49; break;
                 case SDLK_m: key = 50; break;
+                case SDLK_COMMA: key = 51; break;
+                case SDLK_PERIOD: key = 52; break;
+                case SDLK_SLASH: key = 53; break;
+                case SDLK_RSHIFT: key = 54; break;
+                case SDLK_KP_MULTIPLY: key = 55; break;
                 case SDLK_LALT: key = 56; break;
                 case SDLK_SPACE: key = 57; break;
+                case SDLK_F1: key = 59; break;
+                case SDLK_F2: key = 60; break;
+                case SDLK_F3: key = 61; break;
+                case SDLK_F4: key = 62; break;
+                case SDLK_F5: key = 63; break;
+                case SDLK_F6: key = 64; break;
+                case SDLK_F7: key = 65; break;
+                case SDLK_F8: key = 66; break;
+                case SDLK_F9: key = 67; break;
+                case SDLK_F10: key = 68; break;
+                case SDLK_NUMLOCK: key = 69; break;
+                case SDLK_SCROLLOCK: key = 70; break;
+                case SDLK_KP7: key = 71; break;
+                case SDLK_KP8: key = 72; break;
+                case SDLK_KP9: key = 73; break;
+                case SDLK_KP_MINUS: key = 74; break;
+                case SDLK_KP4: key = 75; break;
+                case SDLK_KP5: key = 76; break;
+                case SDLK_KP6: key = 77; break;
+                case SDLK_KP_PLUS: key = 78; break;
+                case SDLK_KP1: key = 79; break;
+                case SDLK_KP2: key = 80; break;
+                case SDLK_KP3: key = 81; break;
+                case SDLK_KP0: key = 82; break;
+                case SDLK_KP_PERIOD: key = 83; break;
+                case SDLK_F11: key = 87; break;
+                case SDLK_F12: key = 88; break;
+                case SDLK_KP_ENTER: key = 96; break;
+                case SDLK_KP_DIVIDE: key = 98; break;
+                case SDLK_SYSREQ: key = 99; break; /* or is it SDLK_PRINT? */
+                case SDLK_RALT: key = 100; break;
+                case SDLK_HOME: key = 102; break;
                 case SDLK_UP: key = 103; break;
-                case SDLK_RIGHT: key = 106; break;
-                case SDLK_DOWN: key = 108; break;
+                case SDLK_PAGEUP: key = 104; break;
                 case SDLK_LEFT: key = 105; break;
+                case SDLK_RIGHT: key = 106; break;
+                case SDLK_END: key = 107; break;
+                case SDLK_DOWN: key = 108; break;
+                case SDLK_PAGEDOWN: key = 109; break;
+                case SDLK_INSERT: key = 110; break;
+                case SDLK_DELETE: key = 111; break;
+                case SDLK_POWER: key = 116; break;
+                case SDLK_BREAK: key = 119; break; /* or is it SDLK_PAUSE? */
+                case SDLK_LSUPER: key = 125; break;
+                case SDLK_RSUPER: key = 126; break;
                 case SDLK_MENU: key = 127; break;
-                default: key = i; break;
+                default:
+                    fprintf(stderr, "Unmapped key %s\n", SDL_GetKeyName(i));
+                    key = 255;
+                    break;
                 }
                 if (cstate[i] == 0 && vkbd_sdlstate[i] == 1) {
                     key |= 0x80;	/* released */
                 }
-                key_buf[key_buf_pos++] = key;
+                if (key != 255)
+                    key_buf[key_buf_pos++] = key;
             }
         }
         memcpy(vkbd_sdlstate, cstate, sz);
