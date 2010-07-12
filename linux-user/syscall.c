@@ -4298,6 +4298,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
         else {
             if (!(p = lock_user(VERIFY_WRITE, arg2, arg3, 0)))
                 goto efault;
+#ifdef CONFIG_VIRTUAL_FBCON
             if (vkbd_fd != -1 && arg1 == vkbd_fd) {
                 fprintf(stderr,"delivering %d keypresses\n", key_buf_pos);
                 ret = key_buf_pos;
@@ -4305,6 +4306,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
                 key_buf_pos = 0;
             }
             else
+#endif
                 ret = get_errno(read(arg1, p, arg3));
             unlock_user(p, arg2, ret);
         }
@@ -4324,10 +4326,12 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
         ret = get_errno(open(path(pp),
                              target_to_host_bitmask(arg2, fcntl_flags_tbl),
                              arg3));
+#ifdef CONFIG_VIRTUAL_FBCON
         if (!strncmp(p, "/dev/fb", 7) && ret > 0) {
             fb_fd = ret;
         }
         if (pp != p && ret > 0) vkbd_fd = ret;
+#endif
         unlock_user(p, arg1, 0);
         break;
 #if defined(TARGET_NR_openat) && defined(__NR_openat)
@@ -4342,10 +4346,12 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
         break;
 #endif
     case TARGET_NR_close:
+#ifdef CONFIG_VIRTUAL_FBCON
         if (fb_fd != -1 && arg1 == fb_fd)
             fb_fd = -1;
         if (vkbd_fd != -1 && arg1 == vkbd_fd)
             vkbd_fd = -1;
+#endif
         ret = get_errno(close(arg1));
         break;
     case TARGET_NR_brk:
